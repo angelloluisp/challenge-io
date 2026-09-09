@@ -1,0 +1,157 @@
+openapi: 3.0.3
+info:
+  title: Card Issuer API
+  description: Event-driven card issuance service for new customers.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:3000
+paths:
+  /cards/issue:
+    post:
+      summary: Request the issuance of a new card
+      operationId: issueCard
+      tags: [cards]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueCardRequest'
+            example:
+              customer:
+                documentType: DNI
+                documentNumber: "11654321"
+                fullName: Jose Perez
+                age: 30
+                email: joseperez@example.com
+              product:
+                type: VISA
+                currency: PEN
+              forceError: false
+      responses:
+        "202":
+          description: Card issuance request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueCardResponse'
+        "400":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: A card request already exists for this document number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /card-requests/{requestId}:
+    get:
+      summary: Get the status of a card request
+      operationId: getCardRequestStatus
+      tags: [cards]
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Card request status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardRequestStatusResponse'
+        "404":
+          description: Card request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    Customer:
+      type: object
+      required: [documentType, documentNumber, fullName, age, email]
+      properties:
+        documentType:
+          type: string
+          enum: [DNI]
+        documentNumber:
+          type: string
+          pattern: '^\d{8}$'
+          example: "11654321"
+        fullName:
+          type: string
+          example: Jose Perez
+        age:
+          type: integer
+          minimum: 18
+          example: 30
+        email:
+          type: string
+          format: email
+          example: joseperez@example.com
+    Product:
+      type: object
+      required: [type, currency]
+      properties:
+        type:
+          type: string
+          enum: [VISA]
+        currency:
+          type: string
+          enum: [PEN, USD]
+    IssueCardRequest:
+      type: object
+      required: [customer, product]
+      properties:
+        customer:
+          $ref: '#/components/schemas/Customer'
+        product:
+          $ref: '#/components/schemas/Product'
+        forceError:
+          type: boolean
+          default: false
+    IssueCardResponse:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING]
+    CardRequestStatusResponse:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, PROCESSING, ISSUED, FAILED]
+        maskedPan:
+          type: string
+          nullable: true
+          example: "**** **** **** 1234"
+        expirationDate:
+          type: string
+          nullable: true
+          example: "09/30"
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

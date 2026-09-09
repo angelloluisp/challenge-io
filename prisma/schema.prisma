@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../libs/database/src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DocumentType {
+  DNI
+}
+
+enum CardType {
+  VISA
+}
+
+enum Currency {
+  PEN
+  USD
+}
+
+enum CardRequestStatus {
+  PENDING
+  PROCESSING
+  ISSUED
+  FAILED
+}
+
+enum OutboxEventStatus {
+  PENDING
+  PUBLISHED
+}
+
+model CardRequest {
+  id             String            @id @default(uuid())
+  requestId      String            @unique
+  documentType   DocumentType
+  documentNumber String            @unique
+  fullName       String
+  age            Int
+  email          String
+  cardType       CardType
+  currency       Currency
+  status         CardRequestStatus @default(PENDING)
+  forceError     Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  card           Card?
+
+  @@index([status])
+  @@map("card_requests")
+}
+
+model Card {
+  id               String      @id @default(uuid())
+  requestId        String      @unique
+  cardRequest      CardRequest @relation(fields: [requestId], references: [requestId])
+  customerDocument String      @unique
+  maskedPan        String
+  expirationDate   String
+  status           String      @default("ISSUED")
+  createdAt        DateTime    @default(now())
+
+  @@map("cards")
+}
+
+model OutboxEvent {
+  id          String            @id @default(uuid())
+  aggregateId String
+  eventType   String
+  payload     Json
+  status      OutboxEventStatus @default(PENDING)
+  attempts    Int               @default(0)
+  createdAt   DateTime          @default(now())
+  publishedAt DateTime?
+
+  @@index([status, createdAt])
+  @@map("outbox_events")
+}
+
+model ProcessedEvent {
+  id          String   @id @default(uuid())
+  eventId     String
+  eventSource String
+  eventType   String
+  processedAt DateTime @default(now())
+
+  @@unique([eventId, eventSource])
+  @@map("processed_events")
+}
